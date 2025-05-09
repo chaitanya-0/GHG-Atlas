@@ -1,0 +1,15 @@
+{
+    "_FillValue": "NaN",
+    "global_total": "39.02Gt",
+    "substance": "CO2",
+    "year": "2023",
+    "release": "EDGARv2024ghg",
+    "long_name": "TOTALS",
+    "description": "TOTALS",
+    "ChunkSizes": [
+        1,
+        1800,
+        3600
+    ],
+    "units": "kg m-2 s-1"
+}
