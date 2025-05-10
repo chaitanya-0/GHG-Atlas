@@ -1,0 +1,7 @@
+Flask==2.3.3
+numpy==1.26.4
+pandas==2.2.2
+geopandas==0.14.4
+netCDF4==1.6.5
+pyproj==3.6.1
+Shapely==2.0.3
