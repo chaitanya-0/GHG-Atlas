@@ -33,3 +33,5 @@ Start the Flask server:
 ```bash
 python flask_server.py
 ```
+
+You can access an instance of the project hosted on [render](https://ghg-atlas.onrender.com/).
