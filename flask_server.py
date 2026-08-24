@@ -12,11 +12,24 @@ import time
 
 app = Flask(__name__)
 
-# Load world map GeoJSON
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DATA_DIR = os.path.join(BASE_DIR, "EDGAR", "data")
+DATA_PR_DIR = os.path.join(DATA_DIR, "data_pr")
+TEMP_DIR = os.path.join(BASE_DIR, "temp")
+
 WORLD_MAP_PATH = os.path.join(
+    BASE_DIR,
     "geojson",
     "ne_110m_admin_0_countries.json"
 )
+
+NC_FILE_PATH = os.path.join(
+    DATA_DIR,
+    "EDGAR_2024_GHG_CO2_2023_TOTALS_flx.nc"
+)
+
+os.makedirs(TEMP_DIR, exist_ok=True)
 
 with open(WORLD_MAP_PATH, "r") as f:
     world_map = json.load(f)
@@ -85,7 +98,7 @@ def country_trend(country_name):
     trend = []
 
     for year in year_range:
-        file_path = DATA_DIR + "data_pr/"
+        file_path = DATA_PR_DIR
         file = next(
             (f for f in os.listdir(file_path) if f.endswith(".csv") and str(year) in f),
             None,
@@ -128,7 +141,7 @@ def search_netcdf():
 @app.route("/load-netcdf/<filename>")
 def make_bin(filename):
     try:
-        dataset = Dataset(DATA_DIR + filename, "r")
+        dataset = Dataset(os.path.join(DATA_DIR, filename), "r")
         var_name = "fluxes"
 
         if var_name not in dataset.variables:
@@ -154,9 +167,9 @@ def make_bin(filename):
         lons = np.asarray(lons)
         values_log = np.asarray(values_log)
 
-        lats.astype(np.float32).tofile("temp/lat.bin")
-        lons.astype(np.float32).tofile("temp/lon.bin")
-        values_log.astype(np.float32).tofile("temp/fluxes.bin")
+        lats.astype(np.float32).tofile(os.path.join(TEMP_DIR, "lat.bin"))
+        lons.astype(np.float32).tofile(os.path.join(TEMP_DIR, "lon.bin"))
+        values_log.astype(np.float32).tofile(os.path.join(TEMP_DIR, "fluxes.bin"))
 
         # Metadata saving (same as yours)
         metadata = {}
@@ -171,7 +184,7 @@ def make_bin(filename):
             else:
                 metadata[attr] = val
 
-        with open("temp/metadata.json", "w") as file:
+        with open(os.path.join(TEMP_DIR, "metadata.json"), "w") as file:
             json.dump(metadata, file, indent=4)
 
         dataset.close()
@@ -186,7 +199,10 @@ def make_bin(filename):
 def serve_metadata():
     try:
         print("SENDING METADATA")
-        return send_file("temp/metadata.json", mimetype="application/json")
+        return send_file(
+            os.path.join(TEMP_DIR, "metadata.json"),
+            mimetype="application/json"
+        )
     except Exception as e:
         print("ERROR IN METADATA:", str(e))
         return jsonify({"error": str(e)}), 404
@@ -198,7 +214,7 @@ def get_heatmap_data(filename):
         valid_files = ["lat.bin", "lon.bin", "fluxes.bin", "metadata.json"]
         if filename in valid_files:
             print("\n sending file... ", filename, "\n")
-            return send_file("temp/" + filename)
+            return send_file(os.path.join(TEMP_DIR, filename))
         return "Invalid file request", 400
 
     except Exception as e:
@@ -208,7 +224,7 @@ def get_heatmap_data(filename):
 @app.route("/global-contributions")
 def global_contri():
     try:
-        file_path = DATA_DIR + "data_pr/"
+        file_path = DATA_PR_DIR
 
         with open("temp/metadata.json", "r") as f:
             meta = json.load(f)
@@ -239,7 +255,7 @@ def global_contri():
 @app.route("/country-year/<country_name>/<int:year>")
 def country_year(country_name, year):
     try:
-        file_path = DATA_DIR + "data_pr/"
+        file_path = DATA_PR_DIR
         curr_file = next(
             (f for f in os.listdir(file_path) if f.endswith(".csv") and str(year) in f),
             None,
@@ -281,7 +297,7 @@ def country_year(country_name, year):
 @app.route("/yearly-change/<int:year>")
 def yearly_change(year):
     try:
-        file_path = DATA_DIR + "data_pr/"
+        file_path = DATA_PR_DIR
         file_this = next(
             (f for f in os.listdir(file_path) if f.endswith(".csv") and str(year) in f),
             None,
@@ -312,7 +328,7 @@ def yearly_change(year):
         return jsonify(result)
     except Exception as e:
         print("Error computing yearly change:", str(e))
-        return jsonify({})
+        return jsonify({"error": str(e)}, 500)
 
 
 @app.route("/nearby-emissions")
@@ -323,9 +339,9 @@ def nearby_emissions():
         Rmi = float(request.args.get("radius", 10))
         Rm = Rmi * 1609.34 
 
-        lats = np.fromfile("temp/lat.bin", np.float32)
-        lons = np.fromfile("temp/lon.bin", np.float32)
-        f_log = np.fromfile("temp/fluxes.bin", np.float32)
+        lats = np.fromfile(os.path.join(TEMP_DIR, "lat.bin"), np.float32)
+        lons = np.fromfile(os.path.join(TEMP_DIR, "lon.bin"), np.float32)
+        f_log = np.fromfile(os.path.join(TEMP_DIR, "fluxes.bin"), np.float32)
         f_log = f_log.reshape(lats.size, lons.size)
 
         mask_valid = ~(np.isnan(f_log) & (f_log <= 0))
@@ -372,7 +388,7 @@ def nearby_emissions():
         cell_area  = np.repeat(strip_area[:,None], lon_size, axis=1)  
         total_kg_s = np.nansum( sub_flux[inside] * cell_area[inside] )
 
-        with open("temp/metadata.json") as fh:
+        with open(os.path.join(TEMP_DIR, "metadata.json")) as fh:
             yr = int(json.load(fh)["year"])
         seconds_year = (datetime(yr + 1, 1, 1) - datetime(yr, 1, 1)).total_seconds()
         total_Mt = (total_kg_s * seconds_year) / 1e9  
