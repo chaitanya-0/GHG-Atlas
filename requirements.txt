@@ -5,3 +5,4 @@ geopandas==0.14.4
 netCDF4==1.6.5
 pyproj==3.6.1
 Shapely==2.0.3
+gunicorn==23.0.0
