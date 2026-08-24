@@ -13,14 +13,22 @@ import time
 app = Flask(__name__)
 
 # Load world map GeoJSON
-with open(r"geojson\ne_110m_admin_0_countries.json", "r") as f:
+WORLD_MAP_PATH = os.path.join(
+    "geojson",
+    "ne_110m_admin_0_countries.json"
+)
+
+with open(WORLD_MAP_PATH, "r") as f:
     world_map = json.load(f)
 
-world = gpd.read_file(r"geojson\ne_110m_admin_0_countries.json")
+world = gpd.read_file(WORLD_MAP_PATH)
 
 # NetCDF file path
-NC_FILE_PATH = "EDGAR_2024_GHG_CO2_2023_TOTALS_flx.nc"
-DATA_DIR = r"EDGAR/data/"
+DATA_DIR = os.path.join("EDGAR", "data")
+NC_FILE_PATH = os.path.join(
+    DATA_DIR,
+    "EDGAR_2024_GHG_CO2_2023_TOTALS_flx.nc"
+)
 
 dataset, lats, lons, values = None, None, None, None
 
